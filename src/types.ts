@@ -71,6 +71,16 @@ export interface LessonGrammar {
   grammarId: string
 }
 
+/** 课文配图（如听力二维码），数据以 data URL 形式保存在本地 IndexedDB */
+export interface LessonImage {
+  id: string
+  lessonId: string
+  dataUrl: string
+  mimeType: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface ReviewRecord {
   id: string
   itemType: ItemKind
@@ -141,6 +151,7 @@ export interface Snapshot {
   examples: Example[]
   lessonVocabulary: LessonVocabulary[]
   lessonGrammar: LessonGrammar[]
+  lessonImages: LessonImage[]
   records: ReviewRecord[]
   mistakes: Mistake[]
   sessions: StudySession[]

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { GrammarForm, LessonForm, LinkPicker, VocabularyForm } from '../components/forms'
+import LessonImagePanel from '../components/LessonImagePanel'
 import {
   Button,
   Card,
@@ -339,9 +340,11 @@ function GrammarTab({ onOpen, onAdd }: { onOpen: (id: string) => void; onAdd: ()
 /* ---------------- 课文列表 ---------------- */
 
 function LessonTab({ onOpen }: { onOpen: (id: string) => void }) {
-  const { lessons, lessonVocabulary, lessonGrammar } = useData()
+  const { lessons, lessonVocabulary, lessonGrammar, lessonImages } = useData()
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
+
+  const imageLessonIds = useMemo(() => new Set(lessonImages.map((i) => i.lessonId)), [lessonImages])
 
   const vocabCount = useMemo(() => {
     const map = new Map<string, number>()
@@ -385,7 +388,14 @@ function LessonTab({ onOpen }: { onOpen: (id: string) => void }) {
                     {lesson.theme ? ` · ${lesson.theme}` : ''}
                   </p>
                 </div>
-                <span className="shrink-0 text-[11px] text-sub">{formatDate(lesson.updatedAt)}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {imageLessonIds.has(lesson.id) && (
+                    <span className="rounded-full bg-pine/10 px-2 py-0.5 text-[10px] text-pine">
+                      二维码
+                    </span>
+                  )}
+                  <span className="text-[11px] text-sub">{formatDate(lesson.updatedAt)}</span>
+                </div>
               </div>
               {lesson.note && <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-sub">{lesson.note}</p>}
             </Card>
@@ -733,6 +743,8 @@ function LessonDetailSheet({ lessonId, onClose }: { lessonId: string; onClose: (
               </p>
             </div>
           )}
+
+          <LessonImagePanel lessonId={lesson.id} />
 
           <div>
             <SectionTitle

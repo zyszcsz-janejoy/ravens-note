@@ -1,5 +1,5 @@
 const DB_NAME = 'ravens-note'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 export const STORES = [
   'lessons',
@@ -8,6 +8,7 @@ export const STORES = [
   'examples',
   'lesson_vocabulary',
   'lesson_grammar',
+  'lesson_images',
   'review_records',
   'mistakes',
   'study_sessions',
@@ -34,6 +35,7 @@ function open(): Promise<IDBDatabase> {
         create('examples', ['ownerId'])
         create('lesson_vocabulary', ['lessonId', 'vocabularyId'])
         create('lesson_grammar', ['lessonId', 'grammarId'])
+        create('lesson_images', ['lessonId'])
         create('review_records', ['createdAt', 'itemId'])
         create('mistakes', ['createdAt', 'itemId'])
         create('study_sessions', ['updatedAt'])

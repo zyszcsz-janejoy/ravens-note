@@ -9,6 +9,7 @@ const EMPTY: Snapshot = {
   examples: [],
   lessonVocabulary: [],
   lessonGrammar: [],
+  lessonImages: [],
   records: [],
   mistakes: [],
   sessions: [],

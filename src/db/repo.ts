@@ -16,6 +16,7 @@ import type {
   ItemKind,
   Lesson,
   LessonGrammar,
+  LessonImage,
   LessonVocabulary,
   Mistake,
   ReviewRecord,
@@ -35,19 +36,41 @@ export interface ExampleInput {
 }
 
 export async function loadSnapshot(): Promise<Snapshot> {
-  const [lessons, vocabulary, grammar, examples, lessonVocabulary, lessonGrammar, records, mistakes, sessions] =
-    await Promise.all([
-      getAll<Lesson>('lessons'),
-      getAll<Vocabulary>('vocabulary'),
-      getAll<Grammar>('grammar'),
-      getAll<Example>('examples'),
-      getAll<LessonVocabulary>('lesson_vocabulary'),
-      getAll<LessonGrammar>('lesson_grammar'),
-      getAll<ReviewRecord>('review_records'),
-      getAll<Mistake>('mistakes'),
-      getAll<StudySession>('study_sessions'),
-    ])
-  return { lessons, vocabulary, grammar, examples, lessonVocabulary, lessonGrammar, records, mistakes, sessions }
+  const [
+    lessons,
+    vocabulary,
+    grammar,
+    examples,
+    lessonVocabulary,
+    lessonGrammar,
+    lessonImages,
+    records,
+    mistakes,
+    sessions,
+  ] = await Promise.all([
+    getAll<Lesson>('lessons'),
+    getAll<Vocabulary>('vocabulary'),
+    getAll<Grammar>('grammar'),
+    getAll<Example>('examples'),
+    getAll<LessonVocabulary>('lesson_vocabulary'),
+    getAll<LessonGrammar>('lesson_grammar'),
+    getAll<LessonImage>('lesson_images'),
+    getAll<ReviewRecord>('review_records'),
+    getAll<Mistake>('mistakes'),
+    getAll<StudySession>('study_sessions'),
+  ])
+  return {
+    lessons,
+    vocabulary,
+    grammar,
+    examples,
+    lessonVocabulary,
+    lessonGrammar,
+    lessonImages,
+    records,
+    mistakes,
+    sessions,
+  }
 }
 
 /* ---------------- 词汇 ---------------- */
@@ -105,6 +128,26 @@ export async function saveLesson(input: LessonInput, existing?: Lesson): Promise
     : { id: uid('l_'), ...input, createdAt: now, updatedAt: now }
   await putOne('lessons', record)
   return record
+}
+
+/** 保存课文配图（每篇课文只保留一张，重复上传会替换） */
+export async function saveLessonImage(lessonId: string, dataUrl: string, mimeType: string): Promise<LessonImage> {
+  const all = await getAll<LessonImage>('lesson_images')
+  const existing = all.find((i) => i.lessonId === lessonId)
+  const now = Date.now()
+  const record: LessonImage = existing
+    ? { ...existing, dataUrl, mimeType, updatedAt: now }
+    : { id: uid('li_'), lessonId, dataUrl, mimeType, createdAt: now, updatedAt: now }
+  await putOne('lesson_images', record)
+  return record
+}
+
+export async function deleteLessonImage(lessonId: string): Promise<void> {
+  const all = await getAll<LessonImage>('lesson_images')
+  await removeMany(
+    'lesson_images',
+    all.filter((i) => i.lessonId === lessonId).map((i) => i.id),
+  )
 }
 
 /* ---------------- 例句 ---------------- */
@@ -226,12 +269,14 @@ export async function deleteGrammar(id: string): Promise<void> {
 }
 
 export async function deleteLesson(id: string): Promise<void> {
-  const [vocabLinks, grammarLinks] = await Promise.all([
+  const [vocabLinks, grammarLinks, lessonImages] = await Promise.all([
     getAll<LessonVocabulary>('lesson_vocabulary'),
     getAll<LessonGrammar>('lesson_grammar'),
+    getAll<LessonImage>('lesson_images'),
   ])
   await removeMany('lesson_vocabulary', vocabLinks.filter((l) => l.lessonId === id).map((l) => l.id))
   await removeMany('lesson_grammar', grammarLinks.filter((l) => l.lessonId === id).map((l) => l.id))
+  await removeMany('lesson_images', lessonImages.filter((i) => i.lessonId === id).map((i) => i.id))
   await removeMany('lessons', [id])
 }
 
@@ -302,6 +347,7 @@ export const BACKUP_KEYS = [
   'examples',
   'lesson_vocabulary',
   'lesson_grammar',
+  'lesson_images',
   'review_records',
   'mistakes',
   'study_sessions',
@@ -324,6 +370,7 @@ export async function buildBackup(): Promise<BackupFile> {
     examples: snap.examples,
     lesson_vocabulary: snap.lessonVocabulary,
     lesson_grammar: snap.lessonGrammar,
+    lesson_images: snap.lessonImages,
     review_records: snap.records,
     mistakes: snap.mistakes,
     study_sessions: snap.sessions,
@@ -397,17 +444,19 @@ export async function importBackup(text: string): Promise<ImportReport> {
   if (!parsed.ok) throw new Error(parsed.error)
   const incoming = parsed.file.data
 
-  const [lessons, vocabulary, grammar, examples, existingLV, existingLG, records, mistakes, sessions] = await Promise.all([
-    getAll<Lesson>('lessons'),
-    getAll<Vocabulary>('vocabulary'),
-    getAll<Grammar>('grammar'),
-    getAll<Example>('examples'),
-    getAll<LessonVocabulary>('lesson_vocabulary'),
-    getAll<LessonGrammar>('lesson_grammar'),
-    getAll<ReviewRecord>('review_records'),
-    getAll<Mistake>('mistakes'),
-    getAll<StudySession>('study_sessions'),
-  ])
+  const [lessons, vocabulary, grammar, examples, existingLV, existingLG, existingImages, records, mistakes, sessions] =
+    await Promise.all([
+      getAll<Lesson>('lessons'),
+      getAll<Vocabulary>('vocabulary'),
+      getAll<Grammar>('grammar'),
+      getAll<Example>('examples'),
+      getAll<LessonVocabulary>('lesson_vocabulary'),
+      getAll<LessonGrammar>('lesson_grammar'),
+      getAll<LessonImage>('lesson_images'),
+      getAll<ReviewRecord>('review_records'),
+      getAll<Mistake>('mistakes'),
+      getAll<StudySession>('study_sessions'),
+    ])
 
   const added: Record<string, number> = {
     lessons: 0,
@@ -415,6 +464,7 @@ export async function importBackup(text: string): Promise<ImportReport> {
     grammar: 0,
     examples: 0,
     links: 0,
+    lesson_images: 0,
     review_records: 0,
     mistakes: 0,
     study_sessions: 0,
@@ -454,6 +504,30 @@ export async function importBackup(text: string): Promise<ImportReport> {
     lessonByTitle.set(title, record)
     lessonMap.set(id, record.id)
     added.lessons++
+  }
+
+  /* 课文配图：每篇课文只保留一张，已有配图的课文不再覆盖 */
+  const validLessonIds = new Set(lessons.map((l) => l.id))
+  const imageLessonIds = new Set(existingImages.map((i) => i.lessonId))
+  const newImages: LessonImage[] = []
+  for (const raw of asArray(incoming.lesson_images)) {
+    const srcLesson = str(raw.lessonId)
+    const dataUrl = str(raw.dataUrl)
+    const lessonId = lessonMap.get(srcLesson) ?? srcLesson
+    if (!dataUrl.startsWith('data:image/') || !validLessonIds.has(lessonId) || imageLessonIds.has(lessonId)) {
+      skipped++
+      continue
+    }
+    imageLessonIds.add(lessonId)
+    newImages.push({
+      id: str(raw.id) || uid('li_'),
+      lessonId,
+      dataUrl,
+      mimeType: str(raw.mimeType) || 'image/png',
+      createdAt: num(raw.createdAt),
+      updatedAt: num(raw.updatedAt),
+    })
+    added.lesson_images++
   }
 
   /* 词汇 */
@@ -691,6 +765,7 @@ export async function importBackup(text: string): Promise<ImportReport> {
   }
 
   await putMany('lessons', newLessons)
+  await putMany('lesson_images', newImages)
   await putMany('vocabulary', newVocab)
   await putMany('grammar', newGrammar)
   await putMany('examples', newExamples)

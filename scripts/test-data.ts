@@ -45,10 +45,17 @@ async function main() {
   await repo.replaceExamples('grammar', g1.id, [{ ja: 'ケーキを食べてしまった。', zh: '不小心把蛋糕吃完了。' }])
   await repo.setItemLessons('grammar', g1.id, [lesson.id])
 
+  const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+  const PIXEL2 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC'
+  await repo.saveLessonImage(lesson.id, PIXEL, 'image/png')
+  await repo.saveLessonImage(lesson.id, PIXEL2, 'image/png') // 重复上传应替换，不新增
+
   let snap: Snapshot = await repo.loadSnapshot()
   assert(snap.vocabulary.length === 1 && snap.grammar.length === 2, '词汇和语法写入成功')
   assert(snap.examples.length === 2, '例句写入成功')
   assert(snap.lessonVocabulary.length === 1 && snap.lessonGrammar.length === 1, '课文关联写入成功')
+  assert(snap.lessonImages.length === 1, '课文配图写入成功（重复上传只保留一张）')
+  assert(snap.lessonImages[0].dataUrl === PIXEL2, '重复上传替换为最新图片')
 
   const counts = countPlan(snap)
   assert(counts.vocab === 1, '到期词汇计数为 1')
@@ -101,6 +108,7 @@ async function main() {
 
   const backup = await repo.buildBackup()
   assert(backup.counts.vocabulary === 1 && backup.counts.grammar === 2, '导出数据计数正确')
+  assert(backup.counts.lesson_images === 1, '导出包含课文配图')
 
   await repo.clearEverything()
   snap = await repo.loadSnapshot()
@@ -117,10 +125,12 @@ async function main() {
     snap.examples.length === 2 && snap.lessonVocabulary.length === 1 && snap.lessonGrammar.length === 1,
     '导入后例句与课文关联正确',
   )
+  assert(snap.lessonImages.length === 1 && snap.lessonImages[0].dataUrl === PIXEL2, '导入后课文配图正确')
 
   const again = await repo.importBackup(JSON.stringify(backup))
   snap = await repo.loadSnapshot()
   assert(again.added.vocabulary === 0 && snap.vocabulary.length === 1, '重复导入不会产生重复数据')
+  assert(again.added.lesson_images === 0 && snap.lessonImages.length === 1, '重复导入不会重复配图')
 
   const savedId = snap.vocabulary[0].id
   await repo.deleteVocabulary(savedId)
@@ -128,6 +138,14 @@ async function main() {
   assert(
     snap.vocabulary.length === 0 && snap.examples.every((e) => e.ownerType !== 'vocab'),
     '删除词汇时级联清理例句',
+  )
+
+  const lessonId = snap.lessons[0].id
+  await repo.deleteLesson(lessonId)
+  snap = await repo.loadSnapshot()
+  assert(
+    snap.lessons.length === 0 && snap.lessonImages.length === 0 && snap.lessonVocabulary.length === 0,
+    '删除课文时级联清理配图与关联',
   )
 
   const bad = repo.parseBackup('{"app":"other","data":{}}')
