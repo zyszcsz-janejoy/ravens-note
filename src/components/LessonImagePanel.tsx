@@ -69,20 +69,15 @@ export default function LessonImagePanel({ lessonId }: { lessonId: string }) {
 
       {image ? (
         <div className="rounded-xl2 border border-line bg-card p-3">
-          <a
-            href={image.dataUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="block overflow-hidden rounded-xl bg-paper"
-            title="点击查看大图"
-          >
+          <div className="overflow-hidden rounded-xl bg-paper">
             <img
               src={image.dataUrl}
               alt="课文听力二维码"
-              className="mx-auto block max-h-[320px] w-auto object-contain"
+              className="mx-auto block max-h-[320px] w-auto select-none object-contain"
+              draggable={false}
             />
-          </a>
-          <p className="mt-2 text-center text-[11px] text-sub">点击图片可查看大图，用手机扫码即可听听力</p>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-sub">长按图片即可识别二维码，扫码听听力</p>
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             <Button variant="soft" onClick={() => inputRef.current?.click()} disabled={busy}>
               {busy ? '保存中…' : '更换'}
