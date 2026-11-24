@@ -130,6 +130,16 @@ npm run test:data
 - 推送到 `main` 分支后，自动执行 `npm ci`、`npm run build`，并把 `dist` 发布到 GitHub Pages
 - 也可以在仓库的 Actions 页面手动触发 `Deploy to GitHub Pages`
 
+### 一键发布
+
+修改完代码后，双击项目根目录的 `发布网站.bat` 即可自动完成：构建 → 数据测试 → 提交（如有改动）→ 推送 → 等待部署完成并显示线上地址。也可以在命令行带一句更新说明：
+
+```bat
+发布网站.bat "本次更新了什么"
+```
+
+> 脚本使用项目自带的便携版 Node / Git / GitHub CLI（位于 `..\.tools`），并把 GitHub 凭据配置保存在 `..\.tools\ghconfig`，不会污染系统环境。
+
 首次在新仓库启用时，需要在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
 
 > Pages 免费版要求仓库为公开仓库。当前网站只包含程序代码，学习数据并不在仓库里。

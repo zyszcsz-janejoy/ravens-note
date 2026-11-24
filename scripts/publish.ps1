@@ -67,16 +67,17 @@ $liveUrl = "https://$owner.github.io/$repo/"
 Ok "仓库：$repoSlug  线上地址：$liveUrl"
 
 # 6. 提交并推送
-$changed = & git status --porcelain
-if ($changed) {
+$changed = @(& git status --porcelain | Where-Object { $_ -ne '' })
+if ($changed.Count -gt 0) {
   $msg = if ($args.Count -gt 0) { $args -join ' ' } else { '更新网站（自动发布）' }
-  Step "提交改动：$msg"
+  Step "提交改动（共 $($changed.Count) 项）：$msg"
+  $changed | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
   & git add -A
   & git commit -m $msg
   if ($LASTEXITCODE -ne 0) { Fail 'git commit 失败' }
   Ok '已提交'
 } else {
-  Warn '工作区没有新改动，跳过提交'
+  Warn '工作区没有新改动，跳过提交（仍会推送并部署）'
 }
 
 Step '推送到 GitHub'
