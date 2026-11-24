@@ -82,15 +82,25 @@ if ($changed.Count -gt 0) {
 
 Step '推送到 GitHub'
 & gh auth setup-git *> $null   # 让 git push 通过 gh 凭据
-& git push origin main
-if ($LASTEXITCODE -ne 0) {
-  # 回退：把令牌直接写进推送 URL
+
+# 低速超过 30 秒就放弃本次连接并重试，避免在不稳定网络下空等几分钟
+function Try-Push($url, $label) {
+  for ($i = 1; $i -le 4; $i++) {
+    & git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push $url main:main
+    if ($LASTEXITCODE -eq 0) { return $true }
+    if ($i -lt 4) { Warn "$label 失败（第 $i/$((4-1)) 次重试，8 秒后）"; Start-Sleep -Seconds 8 }
+  }
+  return $false
+}
+
+$pushed = Try-Push 'origin' '默认推送'
+if (-not $pushed) {
   $token = (& gh auth token).Trim()
   if (-not $token) { Fail 'git push 失败，且无法获取令牌' }
   Warn '默认推送失败，改用令牌 URL 重试'
-  & git push "https://x-access-token:$token@github.com/$repoSlug.git" main:main
-  if ($LASTEXITCODE -ne 0) { Fail 'git push 失败' }
+  $pushed = Try-Push "https://x-access-token:$token@github.com/$repoSlug.git" '令牌推送'
 }
+if (-not $pushed) { Fail 'git push 多次重试仍失败，请检查网络后手动运行：git push origin main' }
 Ok '已推送'
 
 # 7. 等待部署
